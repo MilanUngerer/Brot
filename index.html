@@ -2,369 +2,372 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Condor Nest Hunt (Original + Fractal + Progresión + Etapas)</title>
+  <title>Condor Nest Hunt (Pausa + Menú informativo + Joystick derecha)</title>
   <style>
     body { margin: 0; background: #87CEEB; overflow: hidden; font-family: system-ui, Arial, sans-serif; }
-    canvas { display: block; margin: 64px auto 12px; background: #228B22; box-shadow: 0 8px 24px #0003; border-radius: 8px; }
-    .controls { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); background: #0f172acc; color: #f1f5f9; padding: 8px 12px; border-radius: 12px; display: flex; gap: 16px; align-items: center; box-shadow: 0 8px 24px #0006; }
+    /* margen suficiente para que la barra no tape el canvas */
+    canvas { display: block; margin: 88px auto 12px; background: #228B22; box-shadow: 0 8px 24px #0003; border-radius: 8px; }
+    .controls { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 2px); left: 50%; transform: translateX(-50%); background: #0f172acc; color: #f1f5f9; padding: 8px 12px; border-radius: 12px; display: flex; gap: 16px; align-items: center; box-shadow: 0 8px 24px #0006; flex-wrap: wrap; z-index: 10; }
     .controls b { color: #fde68a; }
-    .controls label { display: inline-flex; align-items: center; gap: 6px; }
-    select { appearance: none; background: #1f2937; color: #e5e7eb; border: 1px solid #374151; padding: 4px 8px; border-radius: 8px; }
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; }
+    .controls .pill { background:#1f2937; border:1px solid #374151; padding:3px 8px; border-radius:8px; color:#e5e7eb; font-variant-numeric: tabular-nums; }
+    .controls .label { display:inline-flex; gap:6px; align-items:center; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 12; }
     .card { background: #121826; color: #e5ecff; padding: 20px 24px; border-radius: 14px; box-shadow: 0 20px 60px #0008; min-width: 320px; text-align: center; }
     .card h2 { margin: 0 0 6px; }
     .btn { background:#ffd166; color:#2b2b2b; border:none; padding:8px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+
+    /* Joystick táctil a la derecha */
+    .joystick { position: fixed; right: 14px; bottom: 14px; width: 150px; height: 150px; touch-action: none; user-select: none; -webkit-user-select: none; z-index: 11; }
+    .joy-base { position: absolute; inset: 0; border-radius: 50%; background: rgba(16,24,40,.32); border: 2px solid rgba(255,255,255,.25); backdrop-filter: blur(8px); }
+    .joy-knob { position: absolute; width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,.6); border: 2px solid rgba(255,255,255,.9); left: 50%; top: 50%; transform: translate(-50%,-50%); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+    /* Botón de pausa flotante (arriba derecha del canvas/móvil) */
+    .pause-btn { position: fixed; right: 14px; bottom: 182px; z-index: 11; background:#ffd166; color:#2b2b2b; border:none; padding:10px 14px; border-radius:12px; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,.35); }
+    @media (max-width: 640px){ .joystick{ width: 130px; height: 130px; } .joy-knob{ width: 56px; height: 56px; } .pause-btn{ bottom: 160px; } }
   </style>
 </head>
 <body>
+  <!-- Barra superior SOLO informativa -->
   <div class="controls">
-    <div>Victorias: <b id="wins">0</b></div>
-    <div>Derrotas: <b id="losses">0</b></div>
-    <label>Velocidad inicial
-      <select id="difficulty">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-      </select>
-    </label>
-    <label>Etapa
-      <select id="stageSelectTop">
-        <option value="1">1 - Claro simple</option>
-        <option value="2">2 - Dos rocas</option>
-        <option value="3">3 - Pasillo central</option>
-        <option value="4">4 - Anillos</option>
-        <option value="5">5 - Zigzag</option>
-        <option value="6">6 - Laberinto corto</option>
-        <option value="7">7 - Campos circulares</option>
-        <option value="8">8 - Bordes peligrosos</option>
-        <option value="9">9 - Estrella</option>
-        <option value="10">10 - Cruces</option>
-      </select>
-    </label>
+    <div class="label">Victorias: <span class="pill" id="wins">0</span></div>
+    <div class="label">Derrotas: <span class="pill" id="losses">0</span></div>
+    <div class="label">Velocidad: <span class="pill" id="hudSpeed">1</span></div>
+    <div class="label">Etapa: <span class="pill" id="hudStage">1</span></div>
+    <div class="label">Modo: <span class="pill" id="hudMode">Difícil</span></div>
+    <div class="label">Niv.etapa: <span class="pill" id="hudStageProg">0/10</span></div>
   </div>
 
+  <!-- Overlays -->
   <div class="overlay" id="startOverlay">
     <div class="card">
-      <h2>Elige etapa y comienza</h2>
-      <p style="opacity:.9;margin:6px 0 10px">Cada victoria aumenta <b>+1 enemigo</b> y <b>+1 nivel de velocidad</b>.<br/>Si pierdes, vuelves al inicio.</p>
-      <label>Etapa
-        <select id="stageSelect">
-          <option value="1">1 - Claro simple</option>
-          <option value="2">2 - Dos rocas</option>
-          <option value="3">3 - Pasillo central</option>
-          <option value="4">4 - Anillos</option>
-          <option value="5">5 - Zigzag</option>
-          <option value="6">6 - Laberinto corto</option>
-          <option value="7">7 - Campos circulares</option>
-          <option value="8">8 - Bordes peligrosos</option>
-          <option value="9">9 - Estrella</option>
-          <option value="10">10 - Cruces</option>
-        </select>
-      </label>
-      <div style="margin-top:12px">
-        <button class="btn" id="startBtn">¡Jugar!</button>
+      <h2>Condor Nest Hunt</h2>
+      <p style="opacity:.9;margin:6px 0 12px">Guía al explorador hasta el nido, esquivando los cóndores. Cada victoria: <b>+1 enemigo</b> y <b>+1 velocidad</b>. Si pierdes, vuelves al inicio.</p>
+      <div style="display:grid; gap:10px; text-align:left; margin:10px auto; max-width:340px">
+        <label>Etapa
+          <select id="stageSelect">
+            <option value="1">1 - Claro simple</option>
+            <option value="2">2 - Dos rocas</option>
+            <option value="3">3 - Pasillo central</option>
+            <option value="4">4 - Anillos</option>
+            <option value="5">5 - Zigzag</option>
+            <option value="6">6 - Laberinto corto</option>
+            <option value="7">7 - Campos circulares</option>
+            <option value="8">8 - Bordes peligrosos</option>
+            <option value="9">9 - Estrella</option>
+            <option value="10">10 - Cruces</option>
+          </select>
+        </label>
+        <label>Velocidad inicial
+          <select id="difficulty">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </label>
+        <label>Modo
+          <select id="modeSelect">
+            <option value="easy">Fácil (3 niveles)</option>
+            <option value="medium">Medio (6 niveles)</option>
+            <option value="hard" selected>Difícil (10 niveles)</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn" id="startBtn">¡Jugar!</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="pauseOverlay" style="display:none">
+    <div class="card">
+      <h2>Pausa</h2>
+      <p style="opacity:.85;margin:6px 0 12px">Ajusta configuración y continúa.</p>
+      <div style="display:grid; gap:10px; text-align:left; margin:10px auto; max-width:340px">
+        <label>Etapa
+          <select id="stageSelectPause">
+            <option value="1">1 - Claro simple</option>
+            <option value="2">2 - Dos rocas</option>
+            <option value="3">3 - Pasillo central</option>
+            <option value="4">4 - Anillos</option>
+            <option value="5">5 - Zigzag</option>
+            <option value="6">6 - Laberinto corto</option>
+            <option value="7">7 - Campos circulares</option>
+            <option value="8">8 - Bordes peligrosos</option>
+            <option value="9">9 - Estrella</option>
+            <option value="10">10 - Cruces</option>
+          </select>
+        </label>
+        <label>Velocidad inicial
+          <select id="difficultyPause">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </label>
+        <label>Modo
+          <select id="modeSelectPause">
+            <option value="easy">Fácil (3 niveles)</option>
+            <option value="medium">Medio (6 niveles)</option>
+            <option value="hard">Difícil (10 niveles)</option>
+          </select>
+        </label>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+        <button class="btn" id="applyContinue">Aplicar y continuar</button>
+        <button class="btn" id="restartStage">Reiniciar etapa</button>
+        <button class="btn" id="resumeBtn">Reanudar</button>
       </div>
     </div>
   </div>
 
   <div class="overlay" id="easterOverlay" style="display:none">
     <div class="card">
-      <h2>¡Maestro de la Etapa!</h2>
-      <p style="opacity:.9;margin:6px 0 12px">Completaste la etapa en nivel 10 de velocidad.</p>
-      <svg width="220" height="220" viewBox="0 0 220 220" role="img" aria-label="Científico famoso estilo Mortal Kombat" style="background:#0b1220;border-radius:12px;box-shadow:0 8px 30px #0006">
-        <!-- máscara ninja -->
-        <rect x="0" y="150" width="220" height="70" fill="#0b1220"/>
-        <!-- cabeza -->
-        <circle cx="110" cy="95" r="60" fill="#f1d5b2"/>
-        <!-- pelo alborotado -->
-        <path d="M40,90 C50,30 170,30 180,90" fill="#2b2b2b"/>
-        <path d="M50,60 C80,20 140,20 170,60" fill="#3a3a3a"/>
-        <!-- cejas -->
-        <rect x="78" y="90" width="24" height="6" rx="3" fill="#2b2b2b"/>
-        <rect x="118" y="90" width="24" height="6" rx="3" fill="#2b2b2b"/>
-        <!-- ojos -->
-        <circle cx="90" cy="105" r="6" fill="#1a1a1a"/>
-        <circle cx="130" cy="105" r="6" fill="#1a1a1a"/>
-        <!-- bigote estilo científico -->
-        <path d="M85,118 C95,128 125,128 135,118" stroke="#2b2b2b" stroke-width="8" fill="none" stroke-linecap="round"/>
-        <!-- máscara MK -->
-        <rect x="70" y="125" width="80" height="26" rx="6" fill="#17a34a"/>
-        <rect x="80" y="130" width="60" height="16" rx="4" fill="#0d5b2a"/>
-        <!-- hombreras -->
-        <rect x="40" y="160" width="40" height="20" rx="6" fill="#17a34a"/>
-        <rect x="140" y="160" width="40" height="20" rx="6" fill="#17a34a"/>
-      </svg>
+      <h2 id="easterTitle">¡Maestro de la Etapa!</h2>
+      <p id="easterDesc" style="opacity:.9;margin:6px 0 12px">Completaste la etapa.</p>
+      <div id="easterArt" style="background:#0b1220;border-radius:12px;box-shadow:0 8px 30px #0006; display:inline-block"></div>
       <div style="margin-top:12px"><button class="btn" id="easterClose">Reiniciar etapa</button></div>
     </div>
   </div>
 
   <canvas id="gameCanvas" width="800" height="600"></canvas>
 
+  <!-- Joystick táctil y botón de pausa -->
+  <button class="pause-btn" id="pauseBtn">⏸ Pausa</button>
+  <div class="joystick" id="joystick">
+    <div class="joy-base" id="joyBase">
+      <div class="joy-knob" id="joyKnob"></div>
+    </div>
+  </div>
+
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+    // Overlays / UI
     const startOverlay = document.getElementById('startOverlay');
+    const pauseOverlay = document.getElementById('pauseOverlay');
     const stageSelect = document.getElementById('stageSelect');
-    const stageSelectTop = document.getElementById('stageSelectTop');
+    const difficultySel = document.getElementById('difficulty');
+    const modeSelect = document.getElementById('modeSelect');
+    const stageSelectPause = document.getElementById('stageSelectPause');
+    const difficultyPause = document.getElementById('difficultyPause');
+    const modeSelectPause = document.getElementById('modeSelectPause');
+
     const easterOverlay = document.getElementById('easterOverlay');
     const easterClose = document.getElementById('easterClose');
+    const easterArt = document.getElementById('easterArt');
+    const easterTitle = document.getElementById('easterTitle');
+    const easterDesc  = document.getElementById('easterDesc');
 
-    // ---- Estado simple base ----
+    const winsEl = document.getElementById('wins');
+    const lossesEl = document.getElementById('losses');
+    const hudSpeed = document.getElementById('hudSpeed');
+    const hudStage = document.getElementById('hudStage');
+    const hudMode = document.getElementById('hudMode');
+    const hudStageProg = document.getElementById('hudStageProg');
+
+    const pauseBtn = document.getElementById('pauseBtn');
+
+    // Joystick
+    const joyBase = document.getElementById('joyBase');
+    const joyKnob = document.getElementById('joyKnob');
+    const joystick = { active:false, dx:0, dy:0 };
+    function getPoint(e){ if(e.touches && e.touches.length){ return { x: e.touches[0].clientX, y: e.touches[0].clientY }; } return { x: e.clientX, y: e.clientY }; }
+    function joyStart(e){ joystick.active = true; joyMove(e); }
+    function joyMove(e){ if(!joystick.active) return; const r = joyBase.getBoundingClientRect(); const p = getPoint(e);
+      let x = p.x - (r.left + r.width/2); let y = p.y - (r.top + r.height/2);
+      const max = r.width/2 - 14; const m = Math.hypot(x,y) || 1; if(m>max){ x = x*max/m; y = y*max/m; }
+      joyKnob.style.left = (r.width/2 + x) + 'px'; joyKnob.style.top = (r.height/2 + y) + 'px'; joyKnob.style.transform='translate(-50%,-50%)';
+      joystick.dx = x / max; joystick.dy = y / max; // -1..1
+    }
+    function joyEnd(){ joystick.active=false; joystick.dx=0; joystick.dy=0; joyKnob.style.left='50%'; joyKnob.style.top='50%'; joyKnob.style.transform='translate(-50%,-50%)'; }
+    joyBase.addEventListener('touchstart', (e)=>{ e.preventDefault(); joyStart(e); }, {passive:false});
+    joyBase.addEventListener('touchmove',  (e)=>{ e.preventDefault(); joyMove(e); }, {passive:false});
+    joyBase.addEventListener('touchend',   joyEnd);
+    joyBase.addEventListener('mousedown',  (e)=>{ e.preventDefault(); joyStart(e); });
+    window.addEventListener('mousemove',   (e)=>{ if(joystick.active) joyMove(e); });
+    window.addEventListener('mouseup',     joyEnd);
+
+    // Juego base
     const player = { x: 50, y: 50, size: 20, speed: 4, color: 'blue' };
     const nest   = { x: 700, y: 500, size: 30, color: 'yellow' };
     const enemies = [];
-    const BASE_ENEMY_COUNT = 5; // inicio
-    let enemyCount = BASE_ENEMY_COUNT;
+    const BASE_ENEMY_COUNT = 5; let enemyCount = BASE_ENEMY_COUNT;
 
-    // Marcadores, dificultad (velocidad) y etapa
-    let wins = 0, losses = 0;
-    let difficulty = 1; // escala de velocidad
-    let initialDifficulty = 1; // seleccionada por usuario
+    let wins = 0, losses = 0, winsInStage = 0;
+    let difficulty = 1, initialDifficulty = 1; // 1..10
     let stage = 1; // 1..10
-    const winsEl = document.getElementById('wins');
-    const lossesEl = document.getElementById('losses');
-    const diffSel = document.getElementById('difficulty');
-    function updateUI(){ winsEl.textContent = wins; lossesEl.textContent = losses; diffSel.value = String(difficulty); stageSelectTop.value=String(stage); }
+    let mode = 'hard'; // easy|medium|hard
+    let paused = false;
 
-    diffSel.addEventListener('change', () => {
-      initialDifficulty = parseInt(diffSel.value, 10) || 1;
-      // se aplicará al iniciar o al reiniciar desde el inicio
-    });
+    function modeThreshold(){ return mode==='easy'?3 : mode==='medium'?6 : 10; }
+    function updateHUD(){
+      winsEl.textContent = wins; lossesEl.textContent = losses;
+      hudSpeed.textContent = difficulty; hudStage.textContent = stage;
+      hudMode.textContent = (mode==='easy'?'Fácil': mode==='medium'?'Medio':'Difícil');
+      hudStageProg.textContent = `${winsInStage}/${modeThreshold()}`;
+    }
 
-    // Selector de etapa en menú superior
-    stageSelectTop.addEventListener('change', ()=>{
-      const n = parseInt(stageSelectTop.value,10)||1;
-      loadStage(n);
-      // cambiar etapa reinicia progreso
-      wins = 0; losses = 0; enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty;
-      resetToStart();
-    });
-
-    // Input
-    const keys = {};
-    document.addEventListener('keydown', e => keys[e.key] = true);
-    document.addEventListener('keyup',   e => keys[e.key] = false);
-
-    // ===== Obstáculos por etapa =====
-    // Tipos: {type:'rect', x,y,w,h}  |  {type:'circle', x,y,r}
+    // Obstáculos
     let obstacles = [];
     function loadStage(n){
-      stage = n;
-      const W=canvas.width, H=canvas.height;
-      const cx=W/2, cy=H/2;
-      const rings = (count, step)=>{ const arr=[]; for(let i=0;i<count;i++){ arr.push({type:'circle', x:cx, y:cy, r: 50+i*step}); } return arr; };
+      stage = n; updateHUD();
+      const W=canvas.width, H=canvas.height; const cx=W/2, cy=H/2;
       const rect = (x,y,w,h)=>({type:'rect', x,y,w,h});
       const circle = (x,y,rad)=>({type:'circle', x,y,r:rad});
+      const rings = (count, step)=>{ const arr=[]; for(let i=0;i<count;i++){ arr.push({type:'circle', x:cx, y:cy, r: 50+i*step}); } return arr; };
       switch(n){
-        case 1: obstacles = []; break; // claro simple
-        case 2: obstacles = [circle(280,200,60), circle(520,380,70)]; break; // rocas
-        case 3: obstacles = [rect(W/2-40, 80, 80, H-160)]; break; // pasillo
-        case 4: obstacles = rings(3, 70); break; // anillos
-        case 5: obstacles = [rect(120,120,120,24), rect(260,220,120,24), rect(400,320,120,24), rect(540,420,120,24)]; break; // zigzag
-        case 6: obstacles = [rect(140,100,520,20), rect(140,200,420,20), rect(240,300,420,20), rect(140,400,420,20)]; break; // mini laberinto
-        case 7: obstacles = [circle(200,160,40), circle(280,260,50), circle(380,200,35), circle(480,320,45), circle(620,220,40)]; break; // campos circulares
-        case 8: obstacles = [rect(0,0,W,20), rect(0,H-20,W,20), rect(0,0,20,H), rect(W-20,0,20,H)]; break; // bordes
-        case 9: obstacles = [circle(cx,cy-90,28), circle(cx+86,cy-28,28), circle(cx+53,cy+75,28), circle(cx-53,cy+75,28), circle(cx-86,cy-28,28)]; break; // estrella
-        case 10: obstacles = [rect(cx-15,60,30,H-120), rect(60,cy-15,W-120,30)]; break; // cruces
+        case 1: obstacles = []; break;
+        case 2: obstacles = [circle(280,200,60), circle(520,380,70)]; break;
+        case 3: obstacles = [rect(W/2-40, 80, 80, H-160)]; break;
+        case 4: obstacles = rings(3, 70); break;
+        case 5: obstacles = [rect(120,120,120,24), rect(260,220,120,24), rect(400,320,120,24), rect(540,420,120,24)]; break;
+        case 6: obstacles = [rect(140,100,520,20), rect(140,200,420,20), rect(240,300,420,20), rect(140,400,420,20)]; break;
+        case 7: obstacles = [circle(200,160,40), circle(280,260,50), circle(380,200,35), circle(480,320,45), circle(620,220,40)]; break;
+        case 8: obstacles = [rect(0,0,W,20), rect(0,H-20,W,20), rect(0,0,20,H), rect(W-20,0,20,H)]; break;
+        case 9: obstacles = [circle(cx,cy-90,28), circle(cx+86,cy-28,28), circle(cx+53,cy+75,28), circle(cx-53,cy+75,28), circle(cx-86,cy-28,28)]; break;
+        case 10: obstacles = [rect(cx-15,60,30,H-120), rect(60,cy-15,W-120,30)]; break;
         default: obstacles = [];
       }
     }
 
-    // ===== Enemigos =====
+    // Enemigos
     function spawnEnemies(){
       enemies.length = 0;
       const speedScale = 1 + 0.35 * (difficulty - 1);
       for (let i = 0; i < enemyCount; i++) {
-        // intenta spawnear fuera de obstáculos
-        let ex,ey,attempt=0; do {
-          ex = Math.random() * (canvas.width - 30);
-          ey = Math.random() * (canvas.height - 30);
-          attempt++;
-        } while(collidesWithObstaclesCircle({x:ex+12, y:ey+12, r:12}) && attempt<50);
+        let ex,ey,attempt=0; do { ex = Math.random() * (canvas.width - 30); ey = Math.random() * (canvas.height - 30); attempt++; } while(collidesWithObstaclesCircle({x:ex+12, y:ey+12, r:12}) && attempt<50);
         const baseX = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2) * speedScale;
         const baseY = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2) * speedScale;
         enemies.push({ x: ex, y: ey, size: 24, color: 'black', dx: baseX, dy: baseY });
       }
     }
 
-    // ---- Mandelbrot (derrota) ----
+    // Fractal muerte
     function createMandelbrotTile(w=128,h=128){
-      const off=document.createElement('canvas'); off.width=w; off.height=h;
-      const ictx=off.getContext('2d'); const img=ictx.createImageData(w,h);
-      const maxIter=80;
-      for(let py=0;py<h;py++){
-        for(let px=0;px<w;px++){
-          const x0=(px/w)*3.0-2.0; const y0=(py/h)*3.0-1.5;
-          let x=0,y=0,iter=0;
-          while(x*x+y*y<=4 && iter<maxIter){ const xt=x*x-y*y+x0; y=2*x*y+y0; x=xt; iter++; }
-          const i=(py*w+px)*4;
-          if(iter===maxIter){ img.data[i]=0; img.data[i+1]=0; img.data[i+2]=0; img.data[i+3]=255; }
-          else { const t=iter/maxIter; img.data[i]=Math.floor(9*(1-t)*t*t*t*255); img.data[i+1]=Math.floor(15*(1-t)*(1-t)*t*t*255); img.data[i+2]=Math.floor(8.5*(1-t)*(1-t)*(1-t)*t*255); img.data[i+3]=255; }
-        }
+      const off=document.createElement('canvas'); off.width=w; off.height=h; const ictx=off.getContext('2d'); const img=ictx.createImageData(w,h); const maxIter=80;
+      for(let py=0;py<h;py++) for(let px=0;px<w;px++){
+        const x0=(px/w)*3.0-2.0, y0=(py/h)*3.0-1.5; let x=0,y=0,iter=0; while(x*x+y*y<=4 && iter<maxIter){ const xt=x*x-y*y+x0; y=2*x*y+y0; x=xt; iter++; }
+        const i=(py*w+px)*4; if(iter===maxIter){ img.data[i]=0; img.data[i+1]=0; img.data[i+2]=0; img.data[i+3]=255; }
+        else { const t=iter/maxIter; img.data[i]=Math.floor(9*(1-t)*t*t*t*255); img.data[i+1]=Math.floor(15*(1-t)*(1-t)*t*t*255); img.data[i+2]=Math.floor(8.5*(1-t)*(1-t)*(1-t)*t*255); img.data[i+3]=255; }
       }
       ictx.putImageData(img,0,0); return off;
     }
     const fractalTile = createMandelbrotTile();
-    const fractalPattern = ctx.createPattern(fractalTile, 'repeat');
+    const fractalPattern = ctx.createPattern(fractalTile,'repeat');
     let dead=false, fractalR=0, fractalCx=0, fractalCy=0;
 
     function resetToStart(){
-      // pierdes => todo al inicio (enemigos y velocidad base)
-      difficulty = initialDifficulty;
-      enemyCount = BASE_ENEMY_COUNT;
+      winsInStage = 0; difficulty = initialDifficulty; enemyCount = BASE_ENEMY_COUNT;
       player.x=50; player.y=50; dead=false; fractalR=0; fractalCx=0; fractalCy=0;
-      spawnEnemies();
-      updateUI();
+      spawnEnemies(); updateHUD();
     }
+    function resetKeepProgress(){ enemyCount++; difficulty = Math.min(10, difficulty + 1); player.x=50; player.y=50; dead=false; fractalR=0; fractalCx=0; fractalCy=0; spawnEnemies(); updateHUD(); }
 
-    function resetKeepProgress(){
-      // ganas => sube 1 enemigo y 1 nivel de velocidad (hasta 10)
-      enemyCount++;
-      difficulty = Math.min(10, difficulty + 1);
-      player.x=50; player.y=50; dead=false; fractalR=0; fractalCx=0; fractalCy=0;
-      spawnEnemies();
-      updateUI();
-    }
+    // Input
+    const keys = {}; document.addEventListener('keydown', e => { keys[e.key] = true; if(e.key==='Escape'){ togglePause(true); } }); document.addEventListener('keyup', e => keys[e.key] = false);
 
-    function movePlayer(){ if(dead) return;
-      const oldX=player.x, oldY=player.y;
-      if (keys['ArrowUp'])    player.y -= player.speed;
-      if (keys['ArrowDown'])  player.y += player.speed;
-      if (keys['ArrowLeft'])  player.x -= player.speed;
-      if (keys['ArrowRight']) player.x += player.speed;
-      // límites
-      player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
-      player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
-      // colisión con obstáculos: resolver por ejes
-      if(collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})){
-        player.x = oldX;
-        if(!collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})) return;
-        player.y = oldY;
-      }
-    }
+    function movePlayer(){ if(dead||paused) return; const oldX=player.x, oldY=player.y; if(keys['ArrowUp']) player.y -= player.speed; if(keys['ArrowDown']) player.y += player.speed; if(keys['ArrowLeft']) player.x -= player.speed; if(keys['ArrowRight']) player.x += player.speed; if(Math.abs(joystick.dx)>0.02||Math.abs(joystick.dy)>0.02){ player.x += joystick.dx * player.speed; player.y += joystick.dy * player.speed; } player.x = Math.max(0, Math.min(canvas.width - player.size, player.x)); player.y = Math.max(0, Math.min(canvas.height - player.size, player.y)); if(collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})){ player.x = oldX; if(!collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})) return; player.y = oldY; } }
 
-    function moveEnemies(){ if(dead) return;
-      for(const e of enemies){
-        const oldX=e.x, oldY=e.y;
-        e.x += e.dx; e.y += e.dy;
-        // paredes
-        if (e.x < 0 || e.x > canvas.width - e.size) e.dx *= -1;
-        if (e.y < 0 || e.y > canvas.height - e.size) e.dy *= -1;
-        // obstáculos: si choca, rebota simple
-        if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){
-          e.x = oldX; e.dx *= -1;
-          if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){
-            e.x = oldX; e.y = oldY; e.dy *= -1;
-          }
-        }
-      }
-    }
+    function moveEnemies(){ if(dead||paused) return; for(const e of enemies){ const oldX=e.x, oldY=e.y; e.x += e.dx; e.y += e.dy; if (e.x < 0 || e.x > canvas.width - e.size) e.dx *= -1; if (e.y < 0 || e.y > canvas.height - e.size) e.dy *= -1; if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){ e.x = oldX; e.dx *= -1; if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){ e.x = oldX; e.y = oldY; e.dy *= -1; } } } }
 
-    function checkCollisions(){ if(dead) return;
-      // enemigos => derrota con fractal
-      for (let e of enemies) {
-        if (player.x < e.x + e.size && player.x + player.size > e.x && player.y < e.y + e.size && player.y + player.size > e.y) {
-          dead = true;
-          fractalCx = player.x + player.size/2; fractalCy = player.y + player.size/2; fractalR = Math.max(18, player.size*0.9);
-          return;
-        }
-      }
-      // nido => victoria y (posible) fin de etapa
-      if (player.x < nest.x + nest.size && player.x + player.size > nest.x && player.y < nest.y + nest.size && player.y + player.size > nest.y) {
-        wins++;
-        if(difficulty >= 10){
-          // fin de etapa
-          easterOverlay.style.display='grid';
-        } else {
-          resetKeepProgress();
-        }
-      }
-    }
+    function checkCollisions(){ if(dead||paused) return; for (let e of enemies) { if (player.x < e.x + e.size && player.x + player.size > e.x && player.y < e.y + e.size && player.y + player.size > e.y) { dead = true; fractalCx = player.x + player.size/2; fractalCy = player.y + player.size/2; fractalR = Math.max(18, player.size*0.9); return; } } if (player.x < nest.x + nest.size && player.x + player.size > nest.x && player.y < nest.y + nest.size && player.y + player.size > nest.y) { wins++; winsInStage++; if(winsInStage >= modeThreshold()){ showEaster(); } else { resetKeepProgress(); } } }
 
     function drawPlayer(){ ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.size, player.size); }
     function drawNest(){ ctx.fillStyle = nest.color; ctx.beginPath(); ctx.arc(nest.x + nest.size/2, nest.y + nest.size/2, nest.size/2, 0, Math.PI * 2); ctx.fill(); }
     function drawEnemies(){ enemies.forEach(e=>{ ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI * 2); ctx.fill(); }); }
-    function drawObstacles(){
-      ctx.save(); ctx.globalAlpha=0.75; ctx.fillStyle = '#3b2f23';
-      for(const o of obstacles){
-        if(o.type==='rect'){ ctx.fillRect(o.x,o.y,o.w,o.h); }
-        else if(o.type==='circle'){ ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill(); }
-      }
-      ctx.restore();
-    }
+    function drawObstacles(){ ctx.save(); ctx.globalAlpha=0.75; ctx.fillStyle = '#3b2f23'; for(const o of obstacles){ if(o.type==='rect'){ ctx.fillRect(o.x,o.y,o.w,o.h); } else if(o.type==='circle'){ ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill(); } } ctx.restore(); }
+    function drawFractalOverlay(){ if(!dead) return; const maxR = Math.hypot(canvas.width, canvas.height); fractalR += 10; ctx.save(); ctx.beginPath(); ctx.arc(fractalCx, fractalCy, fractalR, 0, Math.PI*2); ctx.clip(); ctx.fillStyle = fractalPattern; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); if(fractalR >= maxR){ losses++; resetToStart(); } }
 
-    function drawFractalOverlay(){ if(!dead) return;
-      const maxR = Math.hypot(canvas.width, canvas.height);
-      fractalR += 10;
-      ctx.save(); ctx.beginPath(); ctx.arc(fractalCx, fractalCy, fractalR, 0, Math.PI*2); ctx.clip();
-      ctx.fillStyle = fractalPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.restore();
-      if(fractalR >= maxR){ losses++; resetToStart(); }
-    }
-
-    function drawHudText(){
-      ctx.font = '14px system-ui, Arial';
-      ctx.fillStyle = '#000'; ctx.fillText(`V: ${wins}  D: ${losses}  Vel: ${difficulty}  Etapa: ${stage}  Enems: ${enemyCount}`, 11, 21);
-      ctx.fillStyle = '#fff'; ctx.fillText(`V: ${wins}  D: ${losses}  Vel: ${difficulty}  Etapa: ${stage}  Enems: ${enemyCount}`, 10, 20);
-    }
-
-    // ===== Colisiones con obstáculos =====
     function rectsOverlap(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
-    function circleRectOverlap(c,r){
-      const cx=c.x, cy=c.y; const rx=r.x, ry=r.y, rw=r.w, rh=r.h;
-      const nx = Math.max(rx, Math.min(cx, rx+rw));
-      const ny = Math.max(ry, Math.min(cy, ry+rh));
-      const dx = cx-nx, dy=cy-ny; return (dx*dx + dy*dy) <= (c.r*c.r);
-    }
+    function circleRectOverlap(c,r){ const cx=c.x, cy=c.y; const rx=r.x, ry=r.y, rw=r.w, rh=r.h; const nx = Math.max(rx, Math.min(cx, rx+rw)); const ny = Math.max(ry, Math.min(cy, ry+rh)); const dx = cx-nx, dy=cy-ny; return (dx*dx + dy*dy) <= (c.r*c.r); }
     function circlesOverlap(c1,c2){ const dx=c1.x-c2.x, dy=c1.y-c2.y; const rr=(c1.r+c2.r); return dx*dx+dy*dy<=rr*rr; }
+    function collidesWithObstaclesRect(rect){ for(const o of obstacles){ if(o.type==='rect'){ if(rectsOverlap(rect,o)) return true; } else if(o.type==='circle'){ if(circleRectOverlap({x:rect.x+rect.w/2,y:rect.y+rect.h/2,r:Math.hypot(rect.w,rect.h)/2}, o)) return true; }} return false; }
+    function collidesWithObstaclesCircle(circ){ for(const o of obstacles){ if(o.type==='rect'){ if(circleRectOverlap(circ, o)) return true; } else if(o.type==='circle'){ if(circlesOverlap(circ,o)) return true; }} return false; }
 
-    function collidesWithObstaclesRect(rect){
-      for(const o of obstacles){ if(o.type==='rect'){ if(rectsOverlap(rect,o)) return true; } else if(o.type==='circle'){ if(circleRectOverlap({x:rect.x+rect.w/2,y:rect.y+rect.h/2,r:Math.hypot(rect.w,rect.h)/2}, o)) return true; }}
-      return false;
-    }
-    function collidesWithObstaclesCircle(circ){
-      for(const o of obstacles){ if(o.type==='rect'){ if(circleRectOverlap(circ, o)) return true; } else if(o.type==='circle'){ if(circlesOverlap(circ,o)) return true; }}
-      return false;
-    }
+    // Científicos por etapa (SVG)
+    const SCIENTISTS = [
+      {name:'Einstein', mask:'#17a34a', accent:'#0d5b2a', hair:'#3a3a3a', brow:'#2b2b2b'},
+      {name:'Curie', mask:'#8b5cf6', accent:'#5b21b6', hair:'#2f2f2f', brow:'#1f2937'},
+      {name:'Tesla', mask:'#ef4444', accent:'#7f1d1d', hair:'#2a2a2a', brow:'#111827'},
+      {name:'Newton', mask:'#22c55e', accent:'#14532d', hair:'#4b5563', brow:'#111827'},
+      {name:'Galileo', mask:'#f59e0b', accent:'#92400e', hair:'#3f3f46', brow:'#1f2937'},
+      {name:'Turing', mask:'#06b6d4', accent:'#0e7490', hair:'#1f2937', brow:'#0b1220'},
+      {name:'Hopper', mask:'#e11d48', accent:'#9f1239', hair:'#374151', brow:'#111827'},
+      {name:'Feynman', mask:'#84cc16', accent:'#3f6212', hair:'#111827', brow:'#1f2937'},
+      {name:'Noether', mask:'#a855f7', accent:'#6b21a8', hair:'#3f3f46', brow:'#111827'},
+      {name:'Sagan', mask:'#0ea5e9', accent:'#075985', hair:'#374151', brow:'#111827'}
+    ];
+    function renderScientist(stageIndex){ const s = SCIENTISTS[(stageIndex-1)%SCIENTISTS.length]; return `
+      <svg width="240" height="240" viewBox="0 0 220 220" role="img" aria-label="${s.name} estilo Mortal Kombat">
+        <rect x="0" y="150" width="220" height="70" fill="#0b1220"/>
+        <circle cx="110" cy="95" r="60" fill="#f1d5b2"/>
+        <path d="M40,90 C50,30 170,30 180,90" fill="${s.hair}"/>
+        <path d="M50,60 C80,20 140,20 170,60" fill="${s.hair}" opacity=".9"/>
+        <rect x="78" y="90" width="24" height="6" rx="3" fill="${s.brow}"/>
+        <rect x="118" y="90" width="24" height="6" rx="3" fill="${s.brow}"/>
+        <circle cx="90" cy="105" r="6" fill="#111"/>
+        <circle cx="130" cy="105" r="6" fill="#111"/>
+        <path d="M85,118 C95,128 125,128 135,118" stroke="${s.brow}" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <rect x="70" y="125" width="80" height="26" rx="6" fill="${s.mask}"/>
+        <rect x="80" y="130" width="60" height="16" rx="4" fill="${s.accent}"/>
+        <rect x="40" y="160" width="40" height="20" rx="6" fill="${s.mask}"/>
+        <rect x="140" y="160" width="40" height="20" rx="6" fill="${s.mask}"/>
+      </svg>`; }
 
+    // Pausa / Easter
+    function showEaster(){ easterTitle.textContent = `¡Maestro de la Etapa ${stage}!`; easterDesc.textContent = `Completaste ${winsInStage} niveles (modo ${mode==='easy'?'Fácil':mode==='medium'?'Medio':'Difícil'}).`; easterArt.innerHTML = renderScientist(stage); easterOverlay.style.display='grid'; paused=true; }
+    easterClose?.addEventListener('click', ()=>{ easterOverlay.style.display='none'; enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty; winsInStage = 0; resetToStart(); paused=false; });
+
+    function togglePause(force){ paused = (typeof force==='boolean')? force : !paused; pauseOverlay.style.display = paused? 'grid':'none'; if(paused){ // precargar selects con estado
+        stageSelectPause.value = String(stage);
+        difficultyPause.value = String(initialDifficulty);
+        modeSelectPause.value = mode;
+      }
+    }
+    document.getElementById('resumeBtn').addEventListener('click', ()=> togglePause(false));
+    pauseBtn.addEventListener('click', ()=> togglePause());
+    document.getElementById('applyContinue').addEventListener('click', ()=>{
+      // aplicar configuraciones desde pausa
+      stage = parseInt(stageSelectPause.value,10)||1; loadStage(stage);
+      initialDifficulty = parseInt(difficultyPause.value,10)||1; difficulty = initialDifficulty;
+      mode = modeSelectPause.value;
+      enemyCount = BASE_ENEMY_COUNT; winsInStage = 0; resetToStart();
+      togglePause(false);
+    });
+    document.getElementById('restartStage').addEventListener('click', ()=>{ enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty; winsInStage = 0; resetToStart(); togglePause(false); });
+
+    // Bucle
     function gameLoop(){
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       movePlayer(); moveEnemies(); checkCollisions();
       drawNest(); drawObstacles(); drawPlayer(); drawEnemies();
-      drawFractalOverlay();
-      drawHudText();
+      drawFractalOverlay(); updateHUD();
       requestAnimationFrame(gameLoop);
     }
 
-    // Inicio / Overlay
+    // Inicio: botón Jugar
     document.getElementById('startBtn').addEventListener('click', ()=>{
-      // lee etapa y dificultad inicial
-      loadStage(parseInt(stageSelect.value,10)||1);
-      initialDifficulty = parseInt(diffSel.value,10)||1;
-      difficulty = initialDifficulty;
-      enemyCount = BASE_ENEMY_COUNT;
-      wins=0; losses=0;
-      resetToStart();
-      startOverlay.style.display='none';
+      stage = parseInt(stageSelect.value,10)||1; loadStage(stage);
+      initialDifficulty = parseInt(difficultySel.value,10)||1; difficulty = initialDifficulty;
+      mode = modeSelect.value; enemyCount = BASE_ENEMY_COUNT; wins=0; losses=0; winsInStage=0; resetToStart();
+      startOverlay.style.display='none'; paused=false; // aseguramos que el joystick no bloquee nada
     });
 
-    easterClose.addEventListener('click', ()=>{
-      easterOverlay.style.display='none';
-      // tras completar etapa: reinicia a inicio de la misma etapa
-      enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty; resetToStart();
-    });
-
-    // Boot: UI
-    updateUI();
-    // Mantener overlay visible hasta iniciar
-    requestAnimationFrame(gameLoop);
+    // Arranque del render (overlay visible, pero animación lista)
+    updateHUD(); requestAnimationFrame(gameLoop);
   </script>
 </body>
 </html>
