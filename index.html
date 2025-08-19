@@ -153,18 +153,36 @@
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    const controlsBar = document.querySelector('.controls');
 
     // === Responsive: escala visual manteniendo 4:3 ===
     function resizeCanvas() {
       const aspect = 4/3; // 800x600
-      let w = window.innerWidth;
-      // Reservamos ~140px para controles/joystick en mobile
-      let h = window.innerHeight - 140;
-      if (w / h > aspect) { w = h * aspect; } else { h = w / aspect; }
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
+      const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+      const ch = controlsBar ? Math.ceil(controlsBar.getBoundingClientRect().height) : 0;
+      // margen superior dinámico según barra
+      canvas.style.marginTop = (ch + 12) + 'px';
+
+      let w = window.innerWidth - 16; // pequeño margen lateral
+      // En landscape el alto útil es más escaso: restamos menos para maximizar el canvas
+      let reserve = isLandscape ? 8 : 140; // antes era 140 fijo
+      let h = window.innerHeight - ch - reserve;
+      if (h < 200) h = Math.max(160, window.innerHeight - ch - 8);
+
+      // Ajuste a proporción 4:3
+      if (w / h > aspect) {
+        w = h * aspect;
+      } else {
+        h = w / aspect;
+      }
+      // Limitar a la ventana disponible
+      w = Math.min(w, window.innerWidth - 8);
+
+      canvas.style.width = Math.round(w) + 'px';
+      canvas.style.height = Math.round(h) + 'px';
     }
     window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', ()=> setTimeout(resizeCanvas, 50));
     resizeCanvas();
 
     // === UI refs ===
