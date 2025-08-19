@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Condor Nest Hunt (Original + Fractal + Progresión + Etapas)</title>
+  <style>
+    body { margin: 0; background: #87CEEB; overflow: hidden; font-family: system-ui, Arial, sans-serif; }
+    canvas { display: block; margin: 64px auto 12px; background: #228B22; box-shadow: 0 8px 24px #0003; border-radius: 8px; }
+    .controls { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); background: #0f172acc; color: #f1f5f9; padding: 8px 12px; border-radius: 12px; display: flex; gap: 16px; align-items: center; box-shadow: 0 8px 24px #0006; }
+    .controls b { color: #fde68a; }
+    .controls label { display: inline-flex; align-items: center; gap: 6px; }
+    select { appearance: none; background: #1f2937; color: #e5e7eb; border: 1px solid #374151; padding: 4px 8px; border-radius: 8px; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; }
+    .card { background: #121826; color: #e5ecff; padding: 20px 24px; border-radius: 14px; box-shadow: 0 20px 60px #0008; min-width: 320px; text-align: center; }
+    .card h2 { margin: 0 0 6px; }
+    .btn { background:#ffd166; color:#2b2b2b; border:none; padding:8px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div>Victorias: <b id="wins">0</b></div>
+    <div>Derrotas: <b id="losses">0</b></div>
+    <label>Velocidad inicial
+      <select id="difficulty">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <label>Etapa
+      <select id="stageSelectTop">
+        <option value="1">1 - Claro simple</option>
+        <option value="2">2 - Dos rocas</option>
+        <option value="3">3 - Pasillo central</option>
+        <option value="4">4 - Anillos</option>
+        <option value="5">5 - Zigzag</option>
+        <option value="6">6 - Laberinto corto</option>
+        <option value="7">7 - Campos circulares</option>
+        <option value="8">8 - Bordes peligrosos</option>
+        <option value="9">9 - Estrella</option>
+        <option value="10">10 - Cruces</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <h2>Elige etapa y comienza</h2>
+      <p style="opacity:.9;margin:6px 0 10px">Cada victoria aumenta <b>+1 enemigo</b> y <b>+1 nivel de velocidad</b>.<br/>Si pierdes, vuelves al inicio.</p>
+      <label>Etapa
+        <select id="stageSelect">
+          <option value="1">1 - Claro simple</option>
+          <option value="2">2 - Dos rocas</option>
+          <option value="3">3 - Pasillo central</option>
+          <option value="4">4 - Anillos</option>
+          <option value="5">5 - Zigzag</option>
+          <option value="6">6 - Laberinto corto</option>
+          <option value="7">7 - Campos circulares</option>
+          <option value="8">8 - Bordes peligrosos</option>
+          <option value="9">9 - Estrella</option>
+          <option value="10">10 - Cruces</option>
+        </select>
+      </label>
+      <div style="margin-top:12px">
+        <button class="btn" id="startBtn">¡Jugar!</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="easterOverlay" style="display:none">
+    <div class="card">
+      <h2>¡Maestro de la Etapa!</h2>
+      <p style="opacity:.9;margin:6px 0 12px">Completaste la etapa en nivel 10 de velocidad.</p>
+      <svg width="220" height="220" viewBox="0 0 220 220" role="img" aria-label="Científico famoso estilo Mortal Kombat" style="background:#0b1220;border-radius:12px;box-shadow:0 8px 30px #0006">
+        <!-- máscara ninja -->
+        <rect x="0" y="150" width="220" height="70" fill="#0b1220"/>
+        <!-- cabeza -->
+        <circle cx="110" cy="95" r="60" fill="#f1d5b2"/>
+        <!-- pelo alborotado -->
+        <path d="M40,90 C50,30 170,30 180,90" fill="#2b2b2b"/>
+        <path d="M50,60 C80,20 140,20 170,60" fill="#3a3a3a"/>
+        <!-- cejas -->
+        <rect x="78" y="90" width="24" height="6" rx="3" fill="#2b2b2b"/>
+        <rect x="118" y="90" width="24" height="6" rx="3" fill="#2b2b2b"/>
+        <!-- ojos -->
+        <circle cx="90" cy="105" r="6" fill="#1a1a1a"/>
+        <circle cx="130" cy="105" r="6" fill="#1a1a1a"/>
+        <!-- bigote estilo científico -->
+        <path d="M85,118 C95,128 125,128 135,118" stroke="#2b2b2b" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <!-- máscara MK -->
+        <rect x="70" y="125" width="80" height="26" rx="6" fill="#17a34a"/>
+        <rect x="80" y="130" width="60" height="16" rx="4" fill="#0d5b2a"/>
+        <!-- hombreras -->
+        <rect x="40" y="160" width="40" height="20" rx="6" fill="#17a34a"/>
+        <rect x="140" y="160" width="40" height="20" rx="6" fill="#17a34a"/>
+      </svg>
+      <div style="margin-top:12px"><button class="btn" id="easterClose">Reiniciar etapa</button></div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startOverlay = document.getElementById('startOverlay');
+    const stageSelect = document.getElementById('stageSelect');
+    const stageSelectTop = document.getElementById('stageSelectTop');
+    const easterOverlay = document.getElementById('easterOverlay');
+    const easterClose = document.getElementById('easterClose');
+
+    // ---- Estado simple base ----
+    const player = { x: 50, y: 50, size: 20, speed: 4, color: 'blue' };
+    const nest   = { x: 700, y: 500, size: 30, color: 'yellow' };
+    const enemies = [];
+    const BASE_ENEMY_COUNT = 5; // inicio
+    let enemyCount = BASE_ENEMY_COUNT;
+
+    // Marcadores, dificultad (velocidad) y etapa
+    let wins = 0, losses = 0;
+    let difficulty = 1; // escala de velocidad
+    let initialDifficulty = 1; // seleccionada por usuario
+    let stage = 1; // 1..10
+    const winsEl = document.getElementById('wins');
+    const lossesEl = document.getElementById('losses');
+    const diffSel = document.getElementById('difficulty');
+    function updateUI(){ winsEl.textContent = wins; lossesEl.textContent = losses; diffSel.value = String(difficulty); stageSelectTop.value=String(stage); }
+
+    diffSel.addEventListener('change', () => {
+      initialDifficulty = parseInt(diffSel.value, 10) || 1;
+      // se aplicará al iniciar o al reiniciar desde el inicio
+    });
+
+    // Selector de etapa en menú superior
+    stageSelectTop.addEventListener('change', ()=>{
+      const n = parseInt(stageSelectTop.value,10)||1;
+      loadStage(n);
+      // cambiar etapa reinicia progreso
+      wins = 0; losses = 0; enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty;
+      resetToStart();
+    });
+
+    // Input
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.key] = true);
+    document.addEventListener('keyup',   e => keys[e.key] = false);
+
+    // ===== Obstáculos por etapa =====
+    // Tipos: {type:'rect', x,y,w,h}  |  {type:'circle', x,y,r}
+    let obstacles = [];
+    function loadStage(n){
+      stage = n;
+      const W=canvas.width, H=canvas.height;
+      const cx=W/2, cy=H/2;
+      const rings = (count, step)=>{ const arr=[]; for(let i=0;i<count;i++){ arr.push({type:'circle', x:cx, y:cy, r: 50+i*step}); } return arr; };
+      const rect = (x,y,w,h)=>({type:'rect', x,y,w,h});
+      const circle = (x,y,rad)=>({type:'circle', x,y,r:rad});
+      switch(n){
+        case 1: obstacles = []; break; // claro simple
+        case 2: obstacles = [circle(280,200,60), circle(520,380,70)]; break; // rocas
+        case 3: obstacles = [rect(W/2-40, 80, 80, H-160)]; break; // pasillo
+        case 4: obstacles = rings(3, 70); break; // anillos
+        case 5: obstacles = [rect(120,120,120,24), rect(260,220,120,24), rect(400,320,120,24), rect(540,420,120,24)]; break; // zigzag
+        case 6: obstacles = [rect(140,100,520,20), rect(140,200,420,20), rect(240,300,420,20), rect(140,400,420,20)]; break; // mini laberinto
+        case 7: obstacles = [circle(200,160,40), circle(280,260,50), circle(380,200,35), circle(480,320,45), circle(620,220,40)]; break; // campos circulares
+        case 8: obstacles = [rect(0,0,W,20), rect(0,H-20,W,20), rect(0,0,20,H), rect(W-20,0,20,H)]; break; // bordes
+        case 9: obstacles = [circle(cx,cy-90,28), circle(cx+86,cy-28,28), circle(cx+53,cy+75,28), circle(cx-53,cy+75,28), circle(cx-86,cy-28,28)]; break; // estrella
+        case 10: obstacles = [rect(cx-15,60,30,H-120), rect(60,cy-15,W-120,30)]; break; // cruces
+        default: obstacles = [];
+      }
+    }
+
+    // ===== Enemigos =====
+    function spawnEnemies(){
+      enemies.length = 0;
+      const speedScale = 1 + 0.35 * (difficulty - 1);
+      for (let i = 0; i < enemyCount; i++) {
+        // intenta spawnear fuera de obstáculos
+        let ex,ey,attempt=0; do {
+          ex = Math.random() * (canvas.width - 30);
+          ey = Math.random() * (canvas.height - 30);
+          attempt++;
+        } while(collidesWithObstaclesCircle({x:ex+12, y:ey+12, r:12}) && attempt<50);
+        const baseX = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2) * speedScale;
+        const baseY = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2) * speedScale;
+        enemies.push({ x: ex, y: ey, size: 24, color: 'black', dx: baseX, dy: baseY });
+      }
+    }
+
+    // ---- Mandelbrot (derrota) ----
+    function createMandelbrotTile(w=128,h=128){
+      const off=document.createElement('canvas'); off.width=w; off.height=h;
+      const ictx=off.getContext('2d'); const img=ictx.createImageData(w,h);
+      const maxIter=80;
+      for(let py=0;py<h;py++){
+        for(let px=0;px<w;px++){
+          const x0=(px/w)*3.0-2.0; const y0=(py/h)*3.0-1.5;
+          let x=0,y=0,iter=0;
+          while(x*x+y*y<=4 && iter<maxIter){ const xt=x*x-y*y+x0; y=2*x*y+y0; x=xt; iter++; }
+          const i=(py*w+px)*4;
+          if(iter===maxIter){ img.data[i]=0; img.data[i+1]=0; img.data[i+2]=0; img.data[i+3]=255; }
+          else { const t=iter/maxIter; img.data[i]=Math.floor(9*(1-t)*t*t*t*255); img.data[i+1]=Math.floor(15*(1-t)*(1-t)*t*t*255); img.data[i+2]=Math.floor(8.5*(1-t)*(1-t)*(1-t)*t*255); img.data[i+3]=255; }
+        }
+      }
+      ictx.putImageData(img,0,0); return off;
+    }
+    const fractalTile = createMandelbrotTile();
+    const fractalPattern = ctx.createPattern(fractalTile, 'repeat');
+    let dead=false, fractalR=0, fractalCx=0, fractalCy=0;
+
+    function resetToStart(){
+      // pierdes => todo al inicio (enemigos y velocidad base)
+      difficulty = initialDifficulty;
+      enemyCount = BASE_ENEMY_COUNT;
+      player.x=50; player.y=50; dead=false; fractalR=0; fractalCx=0; fractalCy=0;
+      spawnEnemies();
+      updateUI();
+    }
+
+    function resetKeepProgress(){
+      // ganas => sube 1 enemigo y 1 nivel de velocidad (hasta 10)
+      enemyCount++;
+      difficulty = Math.min(10, difficulty + 1);
+      player.x=50; player.y=50; dead=false; fractalR=0; fractalCx=0; fractalCy=0;
+      spawnEnemies();
+      updateUI();
+    }
+
+    function movePlayer(){ if(dead) return;
+      const oldX=player.x, oldY=player.y;
+      if (keys['ArrowUp'])    player.y -= player.speed;
+      if (keys['ArrowDown'])  player.y += player.speed;
+      if (keys['ArrowLeft'])  player.x -= player.speed;
+      if (keys['ArrowRight']) player.x += player.speed;
+      // límites
+      player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+      player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+      // colisión con obstáculos: resolver por ejes
+      if(collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})){
+        player.x = oldX;
+        if(!collidesWithObstaclesRect({x:player.x, y:player.y, w:player.size, h:player.size})) return;
+        player.y = oldY;
+      }
+    }
+
+    function moveEnemies(){ if(dead) return;
+      for(const e of enemies){
+        const oldX=e.x, oldY=e.y;
+        e.x += e.dx; e.y += e.dy;
+        // paredes
+        if (e.x < 0 || e.x > canvas.width - e.size) e.dx *= -1;
+        if (e.y < 0 || e.y > canvas.height - e.size) e.dy *= -1;
+        // obstáculos: si choca, rebota simple
+        if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){
+          e.x = oldX; e.dx *= -1;
+          if(collidesWithObstaclesCircle({x:e.x+e.size/2, y:e.y+e.size/2, r:e.size/2})){
+            e.x = oldX; e.y = oldY; e.dy *= -1;
+          }
+        }
+      }
+    }
+
+    function checkCollisions(){ if(dead) return;
+      // enemigos => derrota con fractal
+      for (let e of enemies) {
+        if (player.x < e.x + e.size && player.x + player.size > e.x && player.y < e.y + e.size && player.y + player.size > e.y) {
+          dead = true;
+          fractalCx = player.x + player.size/2; fractalCy = player.y + player.size/2; fractalR = Math.max(18, player.size*0.9);
+          return;
+        }
+      }
+      // nido => victoria y (posible) fin de etapa
+      if (player.x < nest.x + nest.size && player.x + player.size > nest.x && player.y < nest.y + nest.size && player.y + player.size > nest.y) {
+        wins++;
+        if(difficulty >= 10){
+          // fin de etapa
+          easterOverlay.style.display='grid';
+        } else {
+          resetKeepProgress();
+        }
+      }
+    }
+
+    function drawPlayer(){ ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.size, player.size); }
+    function drawNest(){ ctx.fillStyle = nest.color; ctx.beginPath(); ctx.arc(nest.x + nest.size/2, nest.y + nest.size/2, nest.size/2, 0, Math.PI * 2); ctx.fill(); }
+    function drawEnemies(){ enemies.forEach(e=>{ ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI * 2); ctx.fill(); }); }
+    function drawObstacles(){
+      ctx.save(); ctx.globalAlpha=0.75; ctx.fillStyle = '#3b2f23';
+      for(const o of obstacles){
+        if(o.type==='rect'){ ctx.fillRect(o.x,o.y,o.w,o.h); }
+        else if(o.type==='circle'){ ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill(); }
+      }
+      ctx.restore();
+    }
+
+    function drawFractalOverlay(){ if(!dead) return;
+      const maxR = Math.hypot(canvas.width, canvas.height);
+      fractalR += 10;
+      ctx.save(); ctx.beginPath(); ctx.arc(fractalCx, fractalCy, fractalR, 0, Math.PI*2); ctx.clip();
+      ctx.fillStyle = fractalPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+      if(fractalR >= maxR){ losses++; resetToStart(); }
+    }
+
+    function drawHudText(){
+      ctx.font = '14px system-ui, Arial';
+      ctx.fillStyle = '#000'; ctx.fillText(`V: ${wins}  D: ${losses}  Vel: ${difficulty}  Etapa: ${stage}  Enems: ${enemyCount}`, 11, 21);
+      ctx.fillStyle = '#fff'; ctx.fillText(`V: ${wins}  D: ${losses}  Vel: ${difficulty}  Etapa: ${stage}  Enems: ${enemyCount}`, 10, 20);
+    }
+
+    // ===== Colisiones con obstáculos =====
+    function rectsOverlap(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+    function circleRectOverlap(c,r){
+      const cx=c.x, cy=c.y; const rx=r.x, ry=r.y, rw=r.w, rh=r.h;
+      const nx = Math.max(rx, Math.min(cx, rx+rw));
+      const ny = Math.max(ry, Math.min(cy, ry+rh));
+      const dx = cx-nx, dy=cy-ny; return (dx*dx + dy*dy) <= (c.r*c.r);
+    }
+    function circlesOverlap(c1,c2){ const dx=c1.x-c2.x, dy=c1.y-c2.y; const rr=(c1.r+c2.r); return dx*dx+dy*dy<=rr*rr; }
+
+    function collidesWithObstaclesRect(rect){
+      for(const o of obstacles){ if(o.type==='rect'){ if(rectsOverlap(rect,o)) return true; } else if(o.type==='circle'){ if(circleRectOverlap({x:rect.x+rect.w/2,y:rect.y+rect.h/2,r:Math.hypot(rect.w,rect.h)/2}, o)) return true; }}
+      return false;
+    }
+    function collidesWithObstaclesCircle(circ){
+      for(const o of obstacles){ if(o.type==='rect'){ if(circleRectOverlap(circ, o)) return true; } else if(o.type==='circle'){ if(circlesOverlap(circ,o)) return true; }}
+      return false;
+    }
+
+    function gameLoop(){
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      movePlayer(); moveEnemies(); checkCollisions();
+      drawNest(); drawObstacles(); drawPlayer(); drawEnemies();
+      drawFractalOverlay();
+      drawHudText();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Inicio / Overlay
+    document.getElementById('startBtn').addEventListener('click', ()=>{
+      // lee etapa y dificultad inicial
+      loadStage(parseInt(stageSelect.value,10)||1);
+      initialDifficulty = parseInt(diffSel.value,10)||1;
+      difficulty = initialDifficulty;
+      enemyCount = BASE_ENEMY_COUNT;
+      wins=0; losses=0;
+      resetToStart();
+      startOverlay.style.display='none';
+    });
+
+    easterClose.addEventListener('click', ()=>{
+      easterOverlay.style.display='none';
+      // tras completar etapa: reinicia a inicio de la misma etapa
+      enemyCount = BASE_ENEMY_COUNT; difficulty = initialDifficulty; resetToStart();
+    });
+
+    // Boot: UI
+    updateUI();
+    // Mantener overlay visible hasta iniciar
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
